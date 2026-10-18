@@ -1,0 +1,527 @@
+openapi: 3.0.3
+info:
+  title: API платформы «Тёплый дом»
+  version: 1.0.0
+  license:
+    name: Внутренняя спецификация проекта
+    url: https://warmhouse.company/docs/api
+  description: >-
+    Публичный REST API, предоставляемый API-шлюзом. Шлюз аутентифицирует
+    пользователя и маршрутизирует запросы в сервис домов и локаций, сервис
+    управления устройствами, сервис телеметрии, автоматизации и видеонаблюдения.
+servers:
+  - url: https://api.warmhouse.company
+    description: Продуктивный API-шлюз
+security:
+  - bearerAuth: []
+tags:
+  - name: Дома
+    description: Дома, локации и привязки доступа
+  - name: Устройства
+    description: Универсальные устройства и команды
+  - name: Телеметрия
+    description: Нормализованные показания устройств
+  - name: Автоматизация
+    description: Пользовательские сценарии и правила
+  - name: Видеонаблюдение
+    description: Сессии просмотра видео
+paths:
+  /houses:
+    post:
+      tags: [Дома]
+      operationId: createHouse
+      summary: Создать дом
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHouseRequest'
+      responses:
+        '201':
+          description: Дом создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/House'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /houses/{houseId}/gateways:
+    parameters:
+      - $ref: '#/components/parameters/HouseId'
+    post:
+      tags: [Дома]
+      operationId: bindGatewayToHouse
+      summary: Привязать IoT-шлюз к дому
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindGatewayRequest'
+      responses:
+        '201':
+          description: Привязка шлюза создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayBinding'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /houses/{houseId}/devices:
+    parameters:
+      - $ref: '#/components/parameters/HouseId'
+    post:
+      tags: [Дома]
+      operationId: bindDeviceToHouse
+      summary: Привязать устройство к дому и локации
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindDeviceRequest'
+      responses:
+        '201':
+          description: Привязка устройства создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceBinding'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /devices:
+    post:
+      tags: [Устройства]
+      operationId: registerDevice
+      summary: Зарегистрировать универсальное устройство
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Устройство зарегистрировано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /devices/{deviceId}/commands:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    post:
+      tags: [Устройства]
+      operationId: sendDeviceCommand
+      summary: Отправить команду устройству по capability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceCommandRequest'
+      responses:
+        '202':
+          description: Команда принята для асинхронного выполнения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /telemetry/devices/{deviceId}/readings:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    get:
+      tags: [Телеметрия]
+      operationId: getDeviceTelemetry
+      summary: Получить нормализованную телеметрию устройства
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: metric
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Показания телеметрии
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryReading'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /scenarios:
+    post:
+      tags: [Автоматизация]
+      operationId: createScenario
+      summary: Создать сценарий автоматизации
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '201':
+          description: Сценарий создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /surveillance/houses/{houseId}/sessions:
+    parameters:
+      - $ref: '#/components/parameters/HouseId'
+    post:
+      tags: [Видеонаблюдение]
+      operationId: createVideoSession
+      summary: Создать сессию просмотра WebRTC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVideoSessionRequest'
+      responses:
+        '201':
+          description: Сессия просмотра создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    HouseId:
+      name: houseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    BadRequest:
+      description: Ошибка проверки параметров запроса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: У пользователя нет доступа к ресурсу
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    House:
+      type: object
+      required: [id, address, timezone]
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        timezone:
+          type: string
+          example: Europe/Moscow
+    CreateHouseRequest:
+      type: object
+      required: [address, timezone]
+      properties:
+        address:
+          type: string
+        timezone:
+          type: string
+    BindGatewayRequest:
+      type: object
+      required: [gatewayId]
+      properties:
+        gatewayId:
+          type: string
+          format: uuid
+    GatewayBinding:
+      type: object
+      required: [houseId, gatewayId]
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    BindDeviceRequest:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        location:
+          type: string
+          example: Гостиная
+    DeviceBinding:
+      type: object
+      required: [houseId, deviceId]
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        location:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    RegisterDeviceRequest:
+      type: object
+      required: [gatewayId, typeCode]
+      properties:
+        gatewayId:
+          type: string
+          format: uuid
+        typeCode:
+          type: string
+          example: relay.switch.v1
+        serialNumber:
+          type: string
+    Device:
+      type: object
+      required: [id, gatewayId, typeCode, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        typeCode:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [online, offline, pending]
+    DeviceCommandRequest:
+      type: object
+      required: [capability, payload]
+      properties:
+        capability:
+          type: string
+          example: switch.set
+        payload:
+          type: object
+          additionalProperties: true
+          example:
+            value: true
+    CommandAccepted:
+      type: object
+      required: [commandId, status]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING]
+    TelemetryReading:
+      type: object
+      required: [deviceId, metric, value, unit, recordedAt, sequence, quality]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        metric:
+          type: string
+          example: temperature
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+          example: celsius
+        recordedAt:
+          type: string
+          format: date-time
+        sequence:
+          type: integer
+          format: int64
+        quality:
+          type: string
+          enum: [GOOD, DEGRADED, INVALID]
+    CreateScenarioRequest:
+      type: object
+      required: [houseId, name, trigger, actions]
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+        trigger:
+          type: object
+          additionalProperties: true
+          example:
+            event: TelemetryRecorded
+            metric: temperature
+            operator: less_than
+            value: 18
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScenarioAction'
+    Scenario:
+      allOf:
+        - $ref: '#/components/schemas/CreateScenarioRequest'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+              format: uuid
+    ScenarioAction:
+      type: object
+      required: [deviceId, capability, payload]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        capability:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    CreateVideoSessionRequest:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        mode:
+          type: string
+          enum: [live, playback]
+          default: live
+    VideoSession:
+      type: object
+      required: [sessionId, signalingUrl, iceServers]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        signalingUrl:
+          type: string
+          format: uri
+        iceServers:
+          type: array
+          items:
+            type: object
+            required: [urls]
+            properties:
+              urls:
+                oneOf:
+                  - type: string
+                  - type: array
+                    items:
+                      type: string
+              username:
+                type: string
+              credential:
+                type: string
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

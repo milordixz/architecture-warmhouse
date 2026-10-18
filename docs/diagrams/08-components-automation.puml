@@ -1,0 +1,32 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты: сервис автоматизации
+
+Container_Boundary(service, "Сервис автоматизации") {
+    Component(api, "API автоматизации", "REST-контроллер", "Создание и запуск сценариев")
+    Component(rule, "Механизм правил", "Сервис предметной области", "Проверяет условия и расписание")
+    Component(player, "Проигрыватель правил", "Прикладной сервис", "Запускает сценарии по событиям и расписанию и исполняет их действия")
+    Component(dispatcher, "Диспетчер действий", "Прикладной сервис", "Отправляет действия сервису управления устройствами")
+    Component(repository, "Репозиторий сценариев", "Репозиторий", "Хранит сценарии и действия")
+}
+ContainerDb(db, "БД автоматизации", "PostgreSQL", "Сценарии и расписания")
+ContainerQueue(platformEvents, "Брокер событий платформы", "Kafka/RabbitMQ", "Нормализованные события телеметрии и состояния")
+Container_Ext(houseService, "Сервис домов и локаций", "Go", "Дома, участники и доступ к сценариям дома")
+Container_Ext(device, "Управление устройствами", "Java", "Универсальные команды по device_id и capabilities")
+Container_Ext(homeGateway, "Домашний IoT-шлюз компании", "Edge software", "Передаёт команды в локальную сеть дома")
+System_Ext(iotDevices, "IoT-устройства в доме", "Датчики, реле и контроллеры")
+
+Rel(api, repository, "Читает и изменяет сценарии")
+Rel(api, houseService, "Проверяет дом и права пользователя", "REST")
+Rel(repository, db, "SQL")
+Rel(platformEvents, player, "Передаёт телеметрию и состояния")
+Rel(player, repository, "Загружает активные сценарии и действия")
+Rel(player, rule, "Передаёт событие на проверку условий")
+Rel(rule, repository, "Читает условия и расписания")
+Rel(rule, player, "Возвращает результат проверки")
+Rel(player, dispatcher, "Проигрывает действия сценария")
+Rel(dispatcher, device, "Выполняет действие устройства по metadata", "REST")
+Rel(device, homeGateway, "Передаёт универсальную команду", "MQTT over TLS")
+Rel(homeGateway, iotDevices, "Выполняет команду по локальному протоколу")
+@enduml

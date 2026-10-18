@@ -1,0 +1,22 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+
+Person(user, "Пользователь", "Управляет отоплением и просматривает температуру")
+System_Ext(web, "Веб-клиент", "Интерфейс пользователя")
+System(monolith, "Монолит «Тёплый дом»", "Go, PostgreSQL, синхронное управление")
+System_Ext(sensor, "Датчики температуры", "Установлены в домах пользователей")
+System_Ext(relay, "Реле отопления", "Включают и выключают отопление")
+Person(specialist, "Специалист по подключению", "Устанавливает и подключает оборудование")
+
+Rel(user, web, "Использует")
+Rel(web, monolith, "Передаёт команды и запрашивает температуру", "HTTPS")
+Rel(monolith, sensor, "Запрашивает показания", "Синхронный HTTP/протокол устройства")
+Rel(monolith, relay, "Передаёт команды управления", "Синхронный протокол устройства")
+Rel(specialist, sensor, "Устанавливает и подключает")
+Rel(specialist, relay, "Устанавливает и подключает")
+
+SHOW_LEGEND()
+@enduml

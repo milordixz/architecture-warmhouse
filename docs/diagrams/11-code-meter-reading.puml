@@ -1,0 +1,32 @@
+@startuml
+title Последовательность на уровне кода: считывание показаний теплосчётчика
+
+participant "Теплосчётчик Пульсар" as Meter
+participant "Адаптер счётчика" as Adapter
+participant "Домашний IoT-шлюз" as HomeGateway
+participant "MQTT-брокер IoT" as MqttBroker
+participant "Управление устройствами" as DeviceManagement
+participant "Сервис телеметрии" as Telemetry
+participant "Брокер событий платформы" as PlatformBroker
+participant "БД телеметрии" as DB
+
+Meter -> Adapter: Импульс или ответ M-Bus/Modbus
+Adapter -> Adapter: Проверить сигнал и обновить pulse_total
+Adapter -> Adapter: Применить pulse_factor или карту регистров
+Adapter -> HomeGateway: MeterReadingRecorded
+HomeGateway -> HomeGateway: Сохранить в локальный буфер
+HomeGateway -> MqttBroker: Опубликовать показание, MQTT/TLS
+MqttBroker -> DeviceManagement: Доставить показание, MQTT
+MqttBroker -> Telemetry: Доставить сырое показание, MQTT
+Telemetry -> DeviceManagement: Получить метаданные и конфигурацию
+DeviceManagement --> Telemetry: category, capabilities, pulse_factor
+Telemetry -> Telemetry: Нормализовать показание и рассчитать расход
+Telemetry -> PlatformBroker: Опубликовать MeterReadingRecorded
+Telemetry -> DB: Сохранить показание и quality
+DB --> Telemetry: Показание сохранено
+
+note over Adapter, HomeGateway
+  При отсутствии интернета шлюз накапливает показания
+  и отправляет их после восстановления соединения.
+end note
+@enduml

@@ -1,0 +1,208 @@
+asyncapi: 2.6.0
+id: urn:warmhouse:messaging-api
+info:
+  title: MQTT API платформы «Тёплый дом»
+  version: 1.0.0
+  contact:
+    name: Команда платформы «Тёплый дом»
+    url: https://warmhouse.company
+    email: platform@warmhouse.company
+  license:
+    name: Внутренняя спецификация проекта
+  description: >-
+    Асинхронные контракты публичного MQTT-брокера домашних шлюзов.
+defaultContentType: application/json
+tags:
+  - name: iot
+    description: Сообщения между платформой и домашними IoT-шлюзами
+servers:
+  iotMqtt:
+    url: mqtt.warmhouse.example.com:8883
+    protocol: mqtt
+    protocolVersion: '5.0'
+    description: Публичный MQTT-брокер для аутентифицированных домашних шлюзов
+    security:
+      - mqttTls: []
+channels:
+  iot/{gatewayId}/commands:
+    description: Команды от сервиса устройств домашнему шлюзу.
+    parameters:
+      gatewayId:
+        $ref: '#/components/parameters/GatewayId'
+    publish:
+      operationId: publishDeviceCommand
+      summary: Опубликовать универсальную команду устройства
+      bindings:
+        mqtt:
+          qos: 1
+      message:
+        $ref: '#/components/messages/DeviceCommand'
+
+  iot/{gatewayId}/state:
+    description: Изменения состояния устройств, переданные домашним шлюзом.
+    parameters:
+      gatewayId:
+        $ref: '#/components/parameters/GatewayId'
+    subscribe:
+      operationId: consumeDeviceStateChanged
+      summary: Получить изменение состояния устройства
+      bindings:
+        mqtt:
+          qos: 1
+      message:
+        $ref: '#/components/messages/DeviceStateChanged'
+
+  iot/{gatewayId}/meter-readings:
+    description: Сырые показания счётчика, буферизованные и опубликованные домашним шлюзом.
+    parameters:
+      gatewayId:
+        $ref: '#/components/parameters/GatewayId'
+    subscribe:
+      operationId: consumeRawMeterReading
+      summary: Получить сырое показание счётчика
+      bindings:
+        mqtt:
+          qos: 1
+      message:
+        $ref: '#/components/messages/RawMeterReading'
+
+  iot/{gatewayId}/discovered:
+    description: Устройства, обнаруженные домашним шлюзом.
+    parameters:
+      gatewayId:
+        $ref: '#/components/parameters/GatewayId'
+    subscribe:
+      operationId: consumeDeviceDiscovered
+      summary: Получить событие обнаружения устройства
+      bindings:
+        mqtt:
+          qos: 1
+      message:
+        $ref: '#/components/messages/DeviceDiscovered'
+
+components:
+  securitySchemes:
+    mqttTls:
+      type: userPassword
+      description: Имя пользователя и пароль MQTT, переданные во время provisioning по HTTPS/TLS
+  parameters:
+    GatewayId:
+      description: Идентификатор домашнего IoT-шлюза
+      schema:
+        type: string
+        format: uuid
+  messages:
+    DeviceCommand:
+      name: DeviceCommand
+      messageId: DeviceCommand
+      title: Универсальная команда устройства
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceCommand'
+    DeviceStateChanged:
+      name: DeviceStateChanged
+      messageId: DeviceStateChanged
+      title: Состояние устройства изменилось
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceStateChanged'
+    RawMeterReading:
+      name: RawMeterReading
+      messageId: RawMeterReading
+      title: Сырое показание счётчика от шлюза
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/RawMeterReading'
+    DeviceDiscovered:
+      name: DeviceDiscovered
+      messageId: DeviceDiscovered
+      title: Шлюз обнаружил устройство
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/DeviceDiscovered'
+  schemas:
+    DeviceCommand:
+      type: object
+      required: [commandId, deviceId, gatewayId, capability, payload, issuedAt]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        capability:
+          type: string
+          example: switch.set
+        payload:
+          type: object
+          additionalProperties: true
+        issuedAt:
+          type: string
+          format: date-time
+
+    DeviceStateChanged:
+      type: object
+      required: [deviceId, gatewayId, state, occurredAt]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        commandId:
+          type: string
+          format: uuid
+        state:
+          type: object
+          additionalProperties: true
+        occurredAt:
+          type: string
+          format: date-time
+
+    RawMeterReading:
+      type: object
+      required: [deviceId, gatewayId, value, recordedAt, sequence]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+        recordedAt:
+          type: string
+          format: date-time
+        sequence:
+          type: integer
+          format: int64
+        quality:
+          type: string
+          enum: [GOOD, DEGRADED, INVALID]
+
+    DeviceDiscovered:
+      type: object
+      required: [deviceId, gatewayId, typeCode, discoveredAt]
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        gatewayId:
+          type: string
+          format: uuid
+        typeCode:
+          type: string
+        protocol:
+          type: string
+        discoveredAt:
+          type: string
+          format: date-time

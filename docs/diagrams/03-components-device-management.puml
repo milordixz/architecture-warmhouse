@@ -1,0 +1,46 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты: управление устройствами
+
+Container_Boundary(service, "Управление устройствами") {
+    Component(api, "API устройств", "REST-контроллер", "Регистрация и управление устройствами")
+    Component(registry, "Реестр устройств", "Прикладной сервис", "Проверка типа и совместимости устройства")
+    Component(deviceMetadata, "Каталог типов и возможностей", "Device metadata", "Определяет категорию, protocol, capabilities и схемы команд")
+    Component(provisioning, "Регистрация и конфигурация шлюзов", "Provisioning", "Регистрация шлюза и выдача MQTT endpoint, идентификатора и прав подключения")
+    Component(command, "Маршрутизатор команд", "Прикладной сервис", "Проверка capabilities и публикация универсальных команд")
+    Component(state, "Менеджер состояния", "Сервис предметной области", "Хранение и публикация состояния")
+    Component(repository, "Репозиторий устройств", "Репозиторий", "Доступ к данным устройств")
+}
+ContainerDb(db, "БД устройств", "PostgreSQL", "Устройства, модули и типы")
+ContainerQueue(platformEvents, "Брокер событий платформы", "Kafka/RabbitMQ", "Внутренние события микросервисов")
+ContainerQueue(mqttBroker, "MQTT-брокер IoT", "EMQX/HiveMQ/Mosquitto", "Команды и показания шлюзов")
+Container_Ext(houseService, "Сервис домов и локаций", "Go", "Дома, участники и привязки шлюзов и устройств")
+Container_Ext(homeGateway, "Домашний IoT-шлюз компании", "Edge software + coordinators + meter adapters", "Zigbee/Z-Wave, Pulse, M-Bus и RS-485/Modbus")
+System_Ext(devices, "IoT-устройства в доме", "Датчики, реле и контроллеры")
+System_Ext(heatMeters, "Теплосчётчики", "Пульсар и другие счётчики")
+
+Rel(api, registry, "Регистрирует устройства через облачную платформу")
+Rel(registry, deviceMetadata, "Определяет тип и capabilities устройства")
+Rel(api, houseService, "Проверяет дом и права привязки", "REST")
+Rel(api, provisioning, "Запускает provisioning шлюза")
+Rel(api, command, "Передаёт команду")
+Rel(command, deviceMetadata, "Проверяет доступную capability")
+Rel(registry, repository, "Сохраняет устройство")
+Rel(deviceMetadata, repository, "Читает типы, capabilities и схемы")
+Rel(homeGateway, provisioning, "Запрашивает provisioning-конфигурацию", "HTTPS/TLS")
+Rel(provisioning, homeGateway, "Возвращает MQTT endpoint, credentials и ACL", "HTTPS/TLS")
+Rel(deviceMetadata, provisioning, "Передаёт конфигурацию адаптера")
+Rel(provisioning, houseService, "Проверяет привязку шлюза к дому", "REST")
+Rel(provisioning, mqttBroker, "Настраивает client credentials и ACL", "Admin API")
+Rel(provisioning, platformEvents, "Публикует StartDevicePairing")
+Rel(command, mqttBroker, "Публикует DeviceCommand", "MQTT over TLS")
+Rel(mqttBroker, homeGateway, "Передаёт команды", "MQTT over TLS")
+Rel(homeGateway, devices, "Координирует и управляет локальными устройствами", "Zigbee/Z-Wave/протоколы компании")
+Rel(homeGateway, heatMeters, "Считывает показания", "Pulse/M-Bus/RS-485/Modbus")
+Rel(homeGateway, mqttBroker, "Публикует обнаруженные устройства, показания, состояние и телеметрию", "MQTT over TLS")
+Rel(mqttBroker, state, "Доставляет DeviceStateChanged", "MQTT")
+Rel(state, repository, "Обновляет состояние")
+Rel(state, platformEvents, "Публикует DeviceStateChanged")
+Rel(repository, db, "SQL")
+@enduml
