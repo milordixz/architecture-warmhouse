@@ -1,0 +1,48 @@
+@startuml
+title Последовательность на уровне кода: выполнение команды устройства
+
+actor "Пользователь" as User
+participant "Веб-/мобильный клиент" as Client
+participant "API-шлюз" as Gateway
+participant "API устройств" as Api
+participant "Маршрутизатор команд" as Command
+participant "Каталог типов и возможностей" as Metadata
+participant "Репозиторий устройств" as Repository
+participant "БД устройств" as DeviceDb
+participant "Сервис домов и локаций" as HouseService
+participant "MQTT-брокер IoT" as MqttBroker
+participant "Домашний IoT-шлюз" as HomeGateway
+participant "Целевое устройство" as Target
+participant "Менеджер состояния" as State
+participant "Брокер событий платформы" as PlatformBroker
+
+User -> Client: Нажать действие устройства
+Client -> Gateway: POST /devices/{deviceId}/commands
+Gateway -> Api: Передать команду и identity
+Api -> Command: Передать команду и identity
+Command -> Metadata: Проверить capability и права
+Metadata -> Repository: Получить тип, capabilities и protocol
+Repository -> DeviceDb: SELECT метаданных устройства
+DeviceDb --> Repository: category, capabilities, protocol
+Repository --> Metadata: Метаданные устройства
+Metadata --> Command: Команда разрешена
+Command -> HouseService: Проверить доступ пользователя к дому и устройству
+HouseService --> Command: Привязка и доступ подтверждены
+Command -> Repository: Сохранить команду PENDING
+Repository -> DeviceDb: INSERT команды
+DeviceDb --> Repository: Команда сохранена
+Command -> MqttBroker: Опубликовать DeviceCommand, MQTT/TLS
+Api --> Gateway: 202 Accepted
+Gateway --> Client: Команда принята
+Client --> User: Показать состояние «выполняется»
+
+MqttBroker -> HomeGateway: DeviceCommand через MQTT/TLS
+HomeGateway -> Target: Выполнить команду по локальному протоколу
+Target --> HomeGateway: Подтвердить выполнение
+HomeGateway -> MqttBroker: DeviceStateChanged
+MqttBroker -> State: Доставить новое состояние
+State -> Repository: Обновить состояние устройства
+Repository -> DeviceDb: UPDATE состояния
+DeviceDb --> Repository: Состояние сохранено
+State -> PlatformBroker: Опубликовать DeviceStateChanged
+@enduml

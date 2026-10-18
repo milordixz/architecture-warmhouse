@@ -1,0 +1,195 @@
+@startuml
+hide methods
+hide stereotypes
+
+title ER-модель целевой экосистемы
+
+entity "Пользователь" as User {
+  * id : uuid <<PK>>
+  --
+  email : varchar
+  name : varchar
+  created_at : timestamp
+}
+
+package "Сервис домов и локаций / БД домов и доступов" {
+  entity "Дом" as House {
+    * id : uuid <<PK>>
+    --
+    owner_id : uuid <<External ID>>
+    address : varchar
+    timezone : varchar
+  }
+
+  entity "Участник дома" as HouseMember {
+    * house_id : uuid <<PK, FK>>
+    * user_id : uuid <<PK, External ID>>
+    --
+    role : varchar
+  }
+
+  entity "Привязка шлюза к дому" as HouseGatewayBinding {
+    * house_id : uuid <<PK, FK>>
+    * gateway_id : uuid <<PK, External ID>>
+    --
+    created_at : timestamp
+  }
+
+  entity "Привязка устройства к дому" as HouseDeviceBinding {
+    * house_id : uuid <<PK, FK>>
+    * device_id : uuid <<PK, External ID>>
+    --
+    location : varchar
+    created_at : timestamp
+  }
+
+  entity "Привязка видеошлюза к дому" as HouseVideoGatewayBinding {
+    * house_id : uuid <<PK, FK>>
+    * video_gateway_id : uuid <<PK, External ID>>
+    --
+    created_at : timestamp
+  }
+}
+
+package "Сервис управления устройствами / БД устройств" {
+  entity "Тип устройства" as DeviceType {
+    * id : uuid <<PK>>
+    --
+    code : varchar
+    category : varchar
+    protocol : varchar
+    capabilities : jsonb
+    command_schema : jsonb
+    telemetry_schema : jsonb
+  }
+
+  entity "Модуль" as Module {
+    * id : uuid <<PK>>
+    --
+    name : varchar
+    status : varchar
+  }
+
+  entity "Домашний IoT-шлюз компании" as Gateway {
+    * id : uuid <<PK>>
+    --
+    serial_number : varchar
+    mqtt_client_id : varchar
+    status : varchar
+    last_seen_at : timestamp
+  }
+
+  entity "Устройство" as Device {
+    * id : uuid <<PK>>
+    --
+    module_id : uuid <<FK>>
+    gateway_id : uuid <<FK>>
+    video_gateway_id : uuid <<External ID>>
+    type_id : uuid <<FK>>
+    serial_number : varchar
+    status : varchar
+  }
+
+  entity "Конфигурация счётчика" as MeterConfig {
+    * id : uuid <<PK>>
+    --
+    device_id : uuid <<FK>>
+    interface : varchar
+    pulse_factor : decimal
+    unit : varchar
+    register_map : jsonb
+  }
+
+  entity "Команда" as Command {
+    * id : uuid <<PK>>
+    --
+    device_id : uuid <<FK>>
+    user_id : uuid <<External ID>>
+    type : varchar
+    payload : jsonb
+    status : varchar
+    created_at : timestamp
+  }
+}
+
+package "Сервис видеонаблюдения / БД видеонаблюдения" {
+  entity "Домашний видео-шлюз/NVR" as VideoGateway {
+    * id : uuid <<PK>>
+    --
+    serial_number : varchar
+    status : varchar
+    last_seen_at : timestamp
+  }
+}
+
+package "Сервис телеметрии / БД телеметрии" {
+  entity "Данные телеметрии" as TelemetryData {
+    * id : uuid <<PK>>
+    --
+    device_id : uuid <<External ID>>
+    metric : varchar
+    value : decimal
+    unit : varchar
+    recorded_at : timestamp
+    sequence : bigint
+    quality : varchar
+  }
+}
+
+package "Сервис автоматизации / БД автоматизации" {
+  entity "Сценарий" as Scenario {
+    * id : uuid <<PK>>
+    --
+    house_id : uuid <<External ID>>
+    name : varchar
+    enabled : boolean
+    trigger : jsonb
+  }
+
+  entity "Действие сценария" as ScenarioAction {
+    * id : uuid <<PK>>
+    --
+    scenario_id : uuid <<FK>>
+    device_id : uuid <<External ID>>
+    action : jsonb
+    position : integer
+  }
+}
+
+package "Медиасервис / метаданные хранилища" {
+  entity "Медиаресурс" as MediaAsset {
+    * id : uuid <<PK>>
+    --
+    device_id : uuid <<External ID>>
+    video_gateway_id : uuid <<External ID>>
+    kind : varchar
+    storage_key : varchar
+    started_at : timestamp
+    ended_at : timestamp
+    expires_at : timestamp
+  }
+}
+
+User ||--o{ House : владеет
+User ||--o{ HouseMember : имеет доступ
+House ||--o{ HouseMember : включает
+House ||--o{ HouseGatewayBinding : содержит
+House ||--o{ HouseDeviceBinding : содержит
+House ||--o{ HouseVideoGatewayBinding : содержит
+HouseGatewayBinding }o..|| Gateway : связывает по external id
+HouseDeviceBinding }o..|| Device : связывает по external id
+HouseVideoGatewayBinding }o..|| VideoGateway : связывает по external id
+Module ||--o{ Device : содержит
+Gateway ||--o{ Device : подключает
+VideoGateway ..> Device : связывает камеры по external id
+DeviceType ||--o{ Device : описывает
+Device ||--o| MeterConfig : имеет
+Device ..> TelemetryData : генерирует по external id
+Device ..> MediaAsset : создаёт по external id
+VideoGateway ..> MediaAsset : загружает по external id
+House ..> Scenario : идентифицирует через house_id
+Scenario ||--o{ ScenarioAction : содержит
+Device ..> ScenarioAction : является целью по external id
+Device ||--o{ Command : получает
+User ..> Command : отправляет по external id
+@enduml

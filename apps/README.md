@@ -16,7 +16,7 @@ The easiest way to start the application is to use Docker Compose:
 
 This script will:
 
-1. Build and start the PostgreSQL and application containers
+1. Build and start PostgreSQL, the Java temperature-api and the application containers
 2. Wait for the services to be ready
 3. Display information about how to access the API
 
@@ -27,6 +27,15 @@ docker-compose up -d
 ```
 
 The API will be available at http://localhost:8080
+
+The temperature service will be available at http://localhost:8081:
+
+```text
+GET /temperature?location=Living%20Room
+```
+
+Each request returns a random temperature value. The compatible endpoint
+`GET /temperature/{sensorId}` is also available for the smart_home application.
 
 ### Option 2: Manual setup
 

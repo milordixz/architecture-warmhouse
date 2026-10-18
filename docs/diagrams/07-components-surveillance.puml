@@ -1,0 +1,33 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Компоненты: сервис видеонаблюдения
+
+Container_Boundary(service, "Сервис видеонаблюдения") {
+    Component(api, "API видеонаблюдения", "REST-контроллер", "Выдаёт метаданные потоков и снимки")
+    Component(access, "Политика доступа", "Сервис предметной области", "Проверяет доступ пользователя к дому")
+    Component(session, "Менеджер видеосессий", "Прикладной сервис", "Создаёт сессии просмотра и записи")
+    Component(repository, "Репозиторий камер", "Репозиторий", "Хранит камеры и адреса потоков")
+}
+ContainerDb(db, "БД видеонаблюдения", "PostgreSQL", "Камеры и настройки доступа")
+Container_Ext(media, "Медиасервис", "Go", "WebRTC, STUN/TURN и медиаретрансляция")
+Container_Ext(stunServer, "STUN-сервер", "coturn", "Определение внешних адресов")
+Container_Ext(turnServer, "TURN-сервер", "coturn", "Relay для WebRTC при сложном NAT")
+Container_Ext(videoGateway, "Домашний видео-шлюз/NVR компании", "Edge software", "Исходящее соединение, локальный буфер и запись")
+Container_Ext(videoStorage, "Объектное хранилище видео", "S3-compatible", "Снимки и видеозаписи")
+Container_Ext(houseService, "Сервис домов и локаций", "Go", "Дома, участники и привязки видеошлюзов")
+System_Ext(cameras, "Камеры в доме", "IP-камеры партнёров и компании")
+
+Rel(api, access, "Проверяет пользователя")
+Rel(access, houseService, "Проверяет доступ пользователя к дому", "REST")
+Rel(access, repository, "Получает камеры дома")
+Rel(api, session, "Запрашивает поток, снимок или запись")
+Rel(session, repository, "Получает конфигурацию камеры")
+Rel(session, media, "Создаёт media session", "REST/WebSocket")
+Rel(media, stunServer, "Использует STUN", "STUN")
+Rel(media, turnServer, "Использует relay", "TURN/TLS")
+Rel(media, videoGateway, "Устанавливает медиасоединение", "WebRTC/TLS")
+Rel(videoGateway, cameras, "Получает поток", "RTSP/ONVIF/протоколы производителя")
+Rel(media, videoStorage, "Сохраняет записи и снимки", "S3 API")
+Rel(repository, db, "SQL")
+@enduml

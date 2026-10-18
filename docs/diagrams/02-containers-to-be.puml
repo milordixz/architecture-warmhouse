@@ -1,0 +1,78 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+
+Person(user, "Пользователь", "Создаёт дом/локацию, привязывает шлюзы и устройства, настраивает сценарии")
+System_Ext(partnerDevices, "IoT-устройства в доме", "Датчики, реле и контроллеры партнёров и компании")
+System_Ext(heatMeters, "Теплосчётчики", "Пульсар и другие счётчики: Pulse, M-Bus, RS-485/Modbus")
+System_Ext(cameras, "Камеры в доме", "IP-камеры партнёров и компании")
+System_Ext(homeGateway, "Домашний IoT-шлюз компании", "Edge-шлюз, координатор устройств и адаптеры счётчиков")
+System_Ext(videoGateway, "Домашний видео-шлюз/NVR компании", "Edge-шлюз видео, локальный буфер и исходящее соединение")
+System_Ext(web, "Веб-/мобильный клиент", "SaaS-интерфейс")
+
+System_Boundary(ecosystem, "Экосистема «Тёплый дом»") {
+    Container_Boundary(publicIngress, "Публичный контур") {
+        Container(gateway, "API-шлюз", "Go", "Публичная HTTPS-точка входа, аутентификация и маршрутизация")
+        ContainerQueue(mqttBroker, "MQTT-брокер IoT", "EMQX/HiveMQ/Mosquitto", "Публичная MQTT-точка входа для домашних шлюзов")
+        Container(stunServer, "STUN-сервер", "coturn", "Публичное определение внешнего адреса для WebRTC")
+        Container(turnServer, "TURN-сервер", "coturn", "Публичная relay-передача медиаданных при сложном NAT")
+    }
+    Container(houseService, "Сервис домов и локаций", "Go", "Дома, локации, участники и привязки шлюзов и устройств")
+    Container(device, "Управление устройствами", "Java", "Реестр устройств, метаданные, provisioning и универсальная маршрутизация команд")
+    Container(surveillance, "Сервис видеонаблюдения", "Go", "Доступ к наблюдению за домом")
+    Container(media, "Медиасервис", "Go", "Сигналинг, WebRTC-сессии, STUN/TURN и медиаретрансляция")
+    Container(automation, "Сервис автоматизации", "Go", "Пользовательские сценарии и расписания")
+    Container(telemetry, "Сервис телеметрии", "Go", "Приём, нормализация и хранение показаний устройств")
+    ContainerQueue(platformBroker, "Брокер событий платформы", "Kafka/RabbitMQ", "Внутренние события между микросервисами")
+    ContainerDb(houseDb, "БД домов и доступов", "PostgreSQL", "Дома, локации, участники и привязки к шлюзам и устройствам")
+    ContainerDb(deviceDb, "БД устройств", "PostgreSQL", "Устройства, шлюзы, модули, типы и конфигурации")
+    ContainerDb(telemetryDb, "БД телеметрии", "PostgreSQL/TimescaleDB", "История телеметрии")
+    Container(videoStorage, "Объектное хранилище видео", "S3-compatible", "Снимки и записи с политикой хранения")
+}
+
+Lay_R(gateway, mqttBroker)
+Lay_R(mqttBroker, stunServer)
+Lay_R(stunServer, turnServer)
+
+Rel(user, web, "Использует")
+Rel(web, gateway, "Создаёт дом, привязывает шлюз и устройства", "HTTPS/REST")
+Rel(web, stunServer, "Участвует в установлении WebRTC-соединения", "STUN")
+Rel(web, turnServer, "Использует relay при необходимости", "TURN/TLS")
+Rel(gateway, houseService, "Создаёт дома, управляет доступом и привязками", "REST")
+Rel(gateway, device, "Регистрирует и управляет устройствами по метаданным", "REST")
+Rel(houseService, houseDb, "Читает и записывает дома и привязки", "SQL")
+Rel(gateway, telemetry, "Просматривает текущие показания и историю телеметрии", "REST")
+Rel(gateway, surveillance, "Запрашивает видеонаблюдение", "REST")
+Rel(gateway, automation, "Управляет сценариями", "REST")
+Rel(homeGateway, device, "Запрашивает provisioning-конфигурацию", "HTTPS/TLS")
+Rel(device, homeGateway, "Выдаёт MQTT endpoint, credentials и ACL", "HTTPS/TLS")
+Rel(device, houseService, "Проверяет дом и права provisioning", "REST")
+Rel(device, mqttBroker, "Настраивает client credentials и ACL", "Admin API")
+Rel(homeGateway, partnerDevices, "Координирует и управляет локальной сетью устройств", "Zigbee/Z-Wave/протоколы компании")
+Rel(homeGateway, heatMeters, "Считывает показания через адаптеры", "Pulse/M-Bus/RS-485/Modbus")
+Rel(videoGateway, cameras, "Получает видеопоток", "RTSP/ONVIF/протоколы производителя")
+Rel(automation, device, "Запускает действия устройств по capabilities", "REST")
+Rel(surveillance, media, "Создаёт сессию просмотра и записи", "REST/WebSocket")
+Rel(videoGateway, media, "Инициирует исходящее медиасоединение", "WebRTC/TLS")
+Rel(media, videoGateway, "Передаёт live-поток и команды записи", "WebRTC/TLS")
+Rel(media, stunServer, "Получает STUN-конфигурацию", "STUN")
+Rel(media, turnServer, "Использует relay для WebRTC", "TURN/TLS")
+Rel(videoGateway, stunServer, "Определяет внешний адрес", "STUN")
+Rel(videoGateway, turnServer, "Использует relay при необходимости", "TURN/TLS")
+Rel(media, videoStorage, "Сохраняет записи и снимки", "S3 API")
+Rel(device, mqttBroker, "Публикует команды устройствам", "MQTT over TLS")
+Rel(mqttBroker, homeGateway, "Передаёт команды устройствам", "MQTT over TLS")
+Rel(homeGateway, mqttBroker, "Публикует телеметрию, показания и состояния", "MQTT over TLS")
+Rel(mqttBroker, telemetry, "Доставляет сырые показания", "MQTT")
+Rel(mqttBroker, device, "Доставляет изменения состояния", "MQTT")
+Rel(device, platformBroker, "Публикует события устройств", "События")
+Rel(telemetry, platformBroker, "Публикует нормализованные показания", "TelemetryRecorded/MeterReadingRecorded")
+Rel(telemetry, device, "Получает метаданные и конфигурацию устройств", "REST")
+Rel(platformBroker, automation, "Доставляет события для условий", "События")
+Rel(device, deviceDb, "Читает и записывает", "SQL")
+Rel(telemetry, telemetryDb, "Записывает телеметрию", "SQL")
+
+SHOW_LEGEND()
+@enduml
